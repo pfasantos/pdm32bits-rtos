@@ -18,5 +18,6 @@
 #define PIN_NUM_CLK  18
 #define PIN_NUM_CS   22
 
-esp_err_t sdcard_init(void);
+esp_err_t sdcard_init(sdmmc_card_t *card);
+esp_err_t sdcard_deinit(sdmmc_card_t *card);
 #endif // _SD_DRIVER_H_
