@@ -1,5 +1,6 @@
 #include "i2s_std.h"
 #include "sd_driver.h"
+#include "pdm2pcm.h"
 #include "main.h"
 
 // TASKS SECTION ----------------------
@@ -9,6 +10,9 @@ void vTaskStart(void *pvParameters)
     // inicia canal i2s
     i2s_channel_reconfig_std_clock(rx_handle, &clk_rec_cfg);
     i2s_channel_enable(rx_handle);
+
+    init_app_cic(&cic);
+    init_app_fir(&fir);
 
     vTaskResume(xTaskReadHandle);
     vTaskResume(xTaskStoreHandle);
@@ -51,7 +55,9 @@ void vTaskStore(void *pvParameters)
     {
         if ((xQueueHandle != NULL) && (xQueueReceive(xQueueHandle, st_buffer, pdMS_TO_TICKS(500)) == pdTRUE))
         {
-            fwrite(st_buffer, 1, BUF_SIZE, audio_file);
+            process_app_cic(&cic, &st_buffer, &data_buffer);
+            process_app_fir(&fir, fir_coeffs, &data_buffer);
+            fwrite(data_buffer, 1, BUF_SIZE, audio_file);
         }
         // leitura parou, escrever oq sobrou
         if (ulTaskNotifyTake(pdTRUE, 0) != 0)
@@ -60,7 +66,9 @@ void vTaskStore(void *pvParameters)
             {
                 if (xQueueReceive(xQueueHandle, st_buffer, 0) == pdTRUE)
                 {
-                    fwrite(st_buffer, 1, BUF_SIZE, audio_file);
+                    process_app_cic(&cic, &st_buffer, &data_buffer);
+                    process_app_fir(&fir, fir_coeffs, &data_buffer);
+                    fwrite(data_buffer, 1, BUF_SIZE, audio_file);
                 }
             }
             break;
@@ -183,8 +191,7 @@ void app_main(void)
         if (xReturnedTask[i] == pdFAIL)
         {
             ESP_LOGE(MAIN_TAG, "Erro ao criar a task %d", i);
-            while (1)
-                ;
+            while (1);
         }
     }
 

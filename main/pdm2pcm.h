@@ -19,7 +19,7 @@
 #endif //C_POSIX_LIB_INCLUDED
 
 
-#define SAMPLES 1024
+#define SAMPLES 1022 
 #define BYTE_PER_SAMPLE 4
 #define APPLY_MASK(x,i) (long)((((x>>(31-i))&0x00000001) << 1)-1)
 #define INPUT_SAMPLE_SIZE 32

@@ -40,9 +40,20 @@ volatile BaseType_t st_flag;
 sdmmc_card_t *card;
 FILE *audio_file;
 
+app_cic_t cic;
+app_fir_t fir;
+
+
 // buffers de gravacao
-char rx_buffer[BUF_SIZE];
-char st_buffer[BUF_SIZE];
+long rx_buffer[BUF_SIZE/4];
+long st_buffer[BUF_SIZE/4];
+short data_buffer[BUF_SIZE/2];
+
+short fir_coeffs[FIR_ORDER] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    1, -1, -1, 4, 0, -9, 4, 34, 34, 4, -9, 0, 4, -1, -1, 1, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+};
 
 // reconfiguracao do clock
 i2s_std_clk_config_t clk_rec_cfg = I2S_STD_CLK_DEFAULT_CONFIG(78125);
