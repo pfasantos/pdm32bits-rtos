@@ -13,7 +13,7 @@
 
 //macros
 #define BIT_DEPTH I2S_DATA_BIT_WIDTH_32BIT                 // i2s bit depth
-#define DMA_BUF_NUM 16                                     // quantity of dma buffers 
+#define DMA_BUF_NUM 24                                     // quantity of dma buffers 
 #define DMA_BUF_SIZE 511                                   // number of samples of dma buffer 
 #define I2S_BUF_SIZE_BYTES 2 * DMA_BUF_SIZE *BIT_DEPTH / 8 // size in bytes of i2s buffer 
 
