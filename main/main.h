@@ -19,12 +19,13 @@
 
 //macros
 #define REC_TIME_MS     5 * 1000                    // recording time
-#define PDM_BUF_SIZE        I2S_BUF_SIZE_BYTES/4    // store buffer in long array
+#define PDM_BUF_SIZE    I2S_BUF_SIZE_BYTES/4        // store buffer in long array
 #define PCM_BUF_SIZE    I2S_BUF_SIZE_BYTES/2        // store buffer in short array
 
 // tags
 #define MAIN_TAG  "main"
 #define I2S_TAG   "i2s"
+#define READ_TAG  "read_task"
 #define STORE_TAG "store_task"
 #define START_TAG "start_task"
 #define TIMER_TAG "timer"
@@ -61,7 +62,7 @@ short fir_coeffs[FIR_ORDER] = {
 };
 
 // reconfiguracao do clock
-i2s_std_clk_config_t clk_rec_cfg = I2S_STD_CLK_DEFAULT_CONFIG(78125);
+i2s_std_clk_config_t clk_rec_cfg = I2S_STD_CLK_DEFAULT_CONFIG(78000);
 
 // function declarations
 void vTaskStart(void *pvParameters);

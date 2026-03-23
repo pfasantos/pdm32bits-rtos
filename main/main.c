@@ -24,6 +24,7 @@ void vTaskStart(void *pvParameters)
 
 void vTaskRead(void *pvParameters)
 {
+    static uint32_t read_count = 0;
     while (1)
     {
         if (ulTaskNotifyTake(pdTRUE, 0) != 0)
@@ -34,6 +35,7 @@ void vTaskRead(void *pvParameters)
         // wait untill rx_buffer is full 
         if (i2s_channel_read(rx_handle, (void *)rx_buffer, I2S_BUF_SIZE_BYTES, NULL, portMAX_DELAY) == ESP_OK)
         {
+            read_count++;
             xQueueSend(xQueueHandle, &rx_buffer, portMAX_DELAY); // enfileirar dados lidos para a tarefa de envio
         }
         else
@@ -42,7 +44,7 @@ void vTaskRead(void *pvParameters)
             break;
         }
     }
-
+    ESP_LOGI(READ_TAG, "Leitura I2S terminada: %lu blocos ", read_count);
     i2s_stop();
 
     xTaskNotifyGive(xTaskStoreHandle);
@@ -51,13 +53,15 @@ void vTaskRead(void *pvParameters)
 
 void vTaskStore(void *pvParameters)
 {
+    static uint32_t write_count = 0;
     while (1)
     {
         if ((xQueueHandle != NULL) && (xQueueReceive(xQueueHandle, st_buffer, pdMS_TO_TICKS(500)) == pdTRUE))
         {
-            //process_app_cic(&cic, &st_buffer, &data_buffer);
-            //process_app_fir(&fir, fir_coeffs, &data_buffer);
-            fwrite(st_buffer, sizeof(long), PDM_BUF_SIZE, audio_file);
+            process_app_cic(&cic, &st_buffer, &data_buffer);
+            process_app_fir(&fir, fir_coeffs, &data_buffer);
+            fwrite(data_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
+            write_count++;
         }
         // write what is left when reading ends 
         if (ulTaskNotifyTake(pdTRUE, 0) != 0)
@@ -66,9 +70,10 @@ void vTaskStore(void *pvParameters)
             {
                 if (xQueueReceive(xQueueHandle, st_buffer, 0) == pdTRUE)
                 {
-                    //process_app_cic(&cic, &st_buffer, &data_buffer);
-                    //process_app_fir(&fir, fir_coeffs, &data_buffer);
-                    fwrite(st_buffer, sizeof(long), PDM_BUF_SIZE, audio_file);
+                    process_app_cic(&cic, &st_buffer, &data_buffer);
+                    process_app_fir(&fir, fir_coeffs, &data_buffer);
+                    fwrite(data_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
+                    write_count++;
                 }
             }
             break;
@@ -78,7 +83,7 @@ void vTaskStore(void *pvParameters)
     fclose(audio_file);
     sdcard_deinit(card);
 
-    ESP_LOGI(STORE_TAG, "Armazenamento encerrado e arquivo salvo.");
+    ESP_LOGI(STORE_TAG, "Armazenamento encerrado e arquivo salvo: %lu blocos gravados", write_count);
     vTaskDelete(NULL);
 }
 
