@@ -7,7 +7,10 @@
 
 void vTaskStart(void *pvParameters)
 {
-    // increase clock and start channel 
+    // start in smaller clock and rise after 5ms
+    i2s_channel_enable(rx_handle);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    i2s_channel_disable(rx_handle);
     i2s_channel_reconfig_std_clock(rx_handle, &clk_rec_cfg);
     i2s_channel_enable(rx_handle);
 
