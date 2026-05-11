@@ -8,7 +8,7 @@
 
 #include "pdm2pcm.h"
 
-long swap_bytes_of_word(long x)
+int32_t swap_bytes_of_word(int32_t x)
 {
     return ((x & 0x000000FF) << 24) | ((x & 0xFF000000) >> 24) | ((x & 0x0000FF00) << 8) | ((x & 0x00FF0000) >> 8);
 }
@@ -18,10 +18,10 @@ void init_fifo(fifo_t *fifo, size_t size)
     fifo->capacity = size;
     fifo->tail = fifo->size = 0;
     fifo->head = fifo->capacity-1;
-    fifo->data = (long*) malloc(fifo->capacity * sizeof(long));
+    fifo->data = (int32_t*) malloc(fifo->capacity * sizeof(int32_t));
 }
 
-void enqueue(fifo_t *fifo, long data_in)
+void enqueue(fifo_t *fifo, int32_t data_in)
 {
     if(fifo->size == fifo->capacity) return;
     fifo->head = (fifo->head+1) % fifo->capacity;
@@ -29,7 +29,7 @@ void enqueue(fifo_t *fifo, long data_in)
     fifo->size++;
 }
 
-void dequeue(fifo_t *fifo, long *data_out)
+void dequeue(fifo_t *fifo, int32_t *data_out)
 {
     if(fifo->size == 0) return;
     *data_out = fifo->data[fifo->tail];
@@ -39,19 +39,19 @@ void dequeue(fifo_t *fifo, long *data_out)
 
 void init_integrator(integrator_t *integ)
 {
-    integ->acc = (long) 0;
+    integ->acc = (int32_t) 0;
 }
 
 void init_comb(comb_t *comb, char delay)
 {
-    comb->previous = (long) 0;
-    comb->actual = (long) 0;
-    comb->diff = (long) 0;
-    comb->previous = (long) 0;
+    comb->previous = (int32_t) 0;
+    comb->actual = (int32_t) 0;
+    comb->diff = (int32_t) 0;
+    comb->previous = (int32_t) 0;
     comb->delay = (char) delay;
     init_fifo(&comb->fifo, delay);
     // comb->fifo = (fifo_t) {0, 0, (size_t)delay+1, malloc(sizeof(void*) * ((size_t)delay+1))};
-    for(int ii=0; ii<delay; ii++) enqueue(&comb->fifo, (long)0);
+    for(int ii=0; ii<delay; ii++) enqueue(&comb->fifo, (int32_t)0);
 }
 
 void init_cic(cic_t *cic, int N, int R, int M)
@@ -70,7 +70,7 @@ void init_cic(cic_t *cic, int N, int R, int M)
     cic->count = 0;
 }
 
-long process_integrator(integrator_t *integ, long data_in)
+int32_t process_integrator(integrator_t *integ, int32_t data_in)
 {
     if (data_in>=MAX_OVERFLOW) data_in -= MAX_OVERFLOW;
     if (data_in<=MIN_OVERFLOW) data_in -= MIN_OVERFLOW;
@@ -83,7 +83,7 @@ long process_integrator(integrator_t *integ, long data_in)
     return integ->acc;
 }
 
-long process_comb(comb_t *comb, long data_in)
+int32_t process_comb(comb_t *comb, int32_t data_in)
 {
     if (data_in>=MAX_OVERFLOW) data_in -= MAX_OVERFLOW;
     if (data_in<=MIN_OVERFLOW) data_in -= MIN_OVERFLOW;
@@ -99,10 +99,10 @@ long process_comb(comb_t *comb, long data_in)
     return comb->diff;
 }
 
-sample_t process_cic(cic_t *cic, long data_in, char *data_available)
+sample_t process_cic(cic_t *cic, int32_t data_in, char *data_available)
 {
     *data_available = 0;
-    long acc = data_in;
+    int32_t acc = data_in;
 
     for(int ii=0; ii<cic->N; ii++) acc = process_integrator(&cic->integrators[ii], acc);
     
@@ -136,9 +136,9 @@ void integ_overflow(app_cic_t *cic)
     cic->acc_s2 = cic->acc_s2<=MIN_OVERFLOW ? cic->acc_s2-MIN_OVERFLOW : cic->acc_s2;
 }
 
-void process_app_cic(app_cic_t *cic, long (*input_buffer)[SAMPLES], short (*output_buffer)[2*SAMPLES])
+void process_app_cic(app_cic_t *cic, int32_t (*input_buffer)[SAMPLES], short (*output_buffer)[2*SAMPLES])
 {
-    long sample, temp, pcm_sample, comb_in[2];
+    int32_t sample, temp, pcm_sample, comb_in[2];
     
     for(int ii=0; ii<SAMPLES; ii++)
     {
@@ -199,5 +199,25 @@ void process_app_fir(app_fir_t *fir, short fir_coeffs[FIR_ORDER], short (*pcm_sa
 
         // compute next sample with filter kernel's samples
         for(int jj=0; jj<size_fir; jj++) (*pcm_samples)[ii] += (fir->kernel[jj]*fir_coeffs[( ( (size_fir-1) - jj) + ii+1) % size_fir]);
+    }
+}
+
+void process_new_fir(short(*pcm_samples)[2 * SAMPLES])
+{
+    static int32_t x_p = 0;
+    static int32_t x_pp = 0;
+    int size_pcm = 2*SAMPLES;
+    int32_t mult, acc, kernel;
+
+    for (int ii=0;ii<size_pcm;ii++)
+    {
+        kernel = (*pcm_samples)[ii];
+        (*pcm_samples)[ii] = 0;
+        mult = (x_p << 3) + (x_p << 1);
+        acc = kernel - mult + x_pp;
+        (*pcm_samples)[ii] = (short)(acc/-8);
+        
+        x_pp = x_p;
+        x_p = kernel; 
     }
 }

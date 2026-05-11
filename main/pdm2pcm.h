@@ -15,37 +15,38 @@
     #include <stdlib.h>
     #include <string.h>
     #include <stdint.h>
+    #include <inttypes.h>
     #include <math.h>
 #endif //C_POSIX_LIB_INCLUDED
 
 
 #define SAMPLES 1022 
 #define BYTE_PER_SAMPLE 4
-#define APPLY_MASK(x,i) (long)((((x>>(31-i))&0x00000001) << 1)-1)
+#define APPLY_MASK(x,i) (int32_t)((((x>>(31-i))&0x00000001) << 1)-1)
 #define INPUT_SAMPLE_SIZE 32
 #define FIR_ORDER 64
 
-#define MAX_OVERFLOW  1073741823 // (long)(pow(2,30)-1)
-#define MIN_OVERFLOW -1073741824 // (long)(-pow(2,30))
+#define MAX_OVERFLOW  1073741823 // (int32_t)(pow(2,30)-1)
+#define MIN_OVERFLOW -1073741824 // (int32_t)(-pow(2,30))
 
 typedef short sample_t;
 
 typedef struct {
     size_t head, tail, size;
     size_t capacity;
-    long* data;
+    int32_t* data;
 } fifo_t;
 
 typedef struct 
 {
-    long acc;
+    int32_t acc;
 } integrator_t;
 
 typedef struct 
 {
-    long previous;
-    long actual;
-    long diff;
+    int32_t previous;
+    int32_t actual;
+    int32_t diff;
     char delay;
     fifo_t fifo;
 } comb_t;
@@ -63,10 +64,10 @@ typedef struct
 
 typedef struct 
 {
-    long acc_s1;
-    long acc_s2;
-    long prev_s1;
-    long prev_s2;
+    int32_t acc_s1;
+    int32_t acc_s2;
+    int32_t prev_s1;
+    int32_t prev_s2;
 } app_cic_t;
 
 typedef struct {
@@ -88,7 +89,7 @@ void init_fifo(fifo_t *fifo, size_t size);
  * @param fifo Pointer to FIFO structure to be modified.
  * @param data_in Data to be enqueued.
  */
-void enqueue(fifo_t *fifo, long data_in);
+void enqueue(fifo_t *fifo, int32_t data_in);
 
 /**
  * @brief Dequeue data from FIFO.
@@ -96,7 +97,7 @@ void enqueue(fifo_t *fifo, long data_in);
  * @param fifo Pointer to FIFO structure to be accessed.
  * @param data_in Data to be enqueued.
  */
-void dequeue(fifo_t *fifo, long *data_out);
+void dequeue(fifo_t *fifo, int32_t *data_out);
 
 /**
  * @brief Initialize Integrator structure with default parameters.
@@ -129,7 +130,7 @@ void init_cic(cic_t *cic, int N, int R, int M);
  * @param integ Pointer to Integrator structure to be modified.
  * @param data_in Data to be processed.
  */
-long process_integrator(integrator_t *integ, long data_in);
+int32_t process_integrator(integrator_t *integ, int32_t data_in);
 
 /**
  * @brief Process one step in Comb structure.
@@ -137,7 +138,7 @@ long process_integrator(integrator_t *integ, long data_in);
  * @param comb Pointer to Comb structure to be modified.
  * @param data_in Data to be processed.
  */
-long process_comb(comb_t *comb, long data_in);
+int32_t process_comb(comb_t *comb, int32_t data_in);
 
 /**
  * @brief Process one step in CIC structure.
@@ -146,14 +147,14 @@ long process_comb(comb_t *comb, long data_in);
  * @param data_in Data to be processed.
  * @param data_available Pointer to flag indicating that there is data available.
  */
-sample_t process_cic(cic_t *cic, long data_in, char *data_available);
+sample_t process_cic(cic_t *cic, int32_t data_in, char *data_available);
 
 /**
- * @brief Swap bytes of word (long).
+ * @brief Swap bytes of word (int32_t).
  * 
- * @param x Long integer to have bytes swapped.
+ * @param x Int32_t integer to have bytes swapped.
  */
-long swap_bytes_of_word(long x);
+int32_t swap_bytes_of_word(int32_t x);
 
 /**
  * @brief Initialize App Specific CIC structure with default parameters.
@@ -181,7 +182,7 @@ void integ_overflow(app_cic_t *cic);
  *
  * @param cic Pointer to App Specific CIC structure to be used.
  */
-void process_app_cic(app_cic_t *cic, long (*input_buffer)[SAMPLES], short (*output_buffer)[2*SAMPLES]);
+void process_app_cic(app_cic_t *cic, int32_t (*input_buffer)[SAMPLES], short (*output_buffer)[2*SAMPLES]);
 
 /**
  * @brief Process input buffer with App Specific FIR structure.
@@ -189,5 +190,7 @@ void process_app_cic(app_cic_t *cic, long (*input_buffer)[SAMPLES], short (*outp
  * @param cic Pointer to App Specific FIR structure to be used.
  */
 void process_app_fir(app_fir_t *fir, short fir_coeffs[FIR_ORDER], short (*pcm_samples)[2*SAMPLES]);
+
+void process_new_fir(short (*pcm_samples)[2*SAMPLES]);
 
 #endif // _PDM2PCM_H_
