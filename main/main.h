@@ -19,8 +19,8 @@
 
 //macros
 #define REC_TIME_MS     5 * 1000                    // recording time
-#define PDM_BUF_SIZE    I2S_BUF_SIZE_BYTES/4        // store buffer in long array
-#define PCM_BUF_SIZE    I2S_BUF_SIZE_BYTES/2        // store buffer in short array
+#define PDM_BUF_SIZE    BUF_SIZE/4        // store buffer in long array
+#define PCM_BUF_SIZE    BUF_SIZE/2        // store buffer in short array
 
 // tags
 #define MAIN_TAG  "main"

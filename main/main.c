@@ -5,29 +5,8 @@
 
 // TASKS SECTION --------------------------
 
-void vTaskStart(void *pvParameters)
-{
-    // start in smaller clock and rise after 5ms
-    i2s_channel_enable(rx_handle);
-    vTaskDelay(pdMS_TO_TICKS(5));
-    i2s_channel_disable(rx_handle);
-    i2s_channel_reconfig_std_clock(rx_handle, &clk_rec_cfg);
-    i2s_channel_enable(rx_handle);
-
-    init_app_cic(&cic);
-    init_app_fir(&fir);
-
-    vTaskResume(xTaskReadHandle);
-    vTaskResume(xTaskStoreHandle);
-    xTimerStart(xRecTimerHandle, 0);
-    ESP_LOGI(START_TAG, "Gravacao iniciada");
-
-    vTaskSuspend(xTaskStartHandle);
-}
-
 void vTaskRead(void *pvParameters)
 {
-    static uint32_t read_count = 0;
     while (1)
     {
         if (ulTaskNotifyTake(pdTRUE, 0) != 0)
@@ -36,10 +15,9 @@ void vTaskRead(void *pvParameters)
         }
 
         // wait untill rx_buffer is full 
-        if (i2s_channel_read(rx_handle, (void *)rx_buffer, I2S_BUF_SIZE_BYTES, NULL, portMAX_DELAY) == ESP_OK)
+        if (i2s_channel_read(rx_handle, (void *)rx_buffer, BUF_SIZE, NULL, portMAX_DELAY) == ESP_OK)
         {
-            read_count++;
-            xQueueSend(xQueueHandle, &rx_buffer, portMAX_DELAY); // enfileirar dados lidos para a tarefa de envio
+            xQueueSend(xQueueHandle, &rx_buffer, portMAX_DELAY);
         }
         else
         {
@@ -47,7 +25,7 @@ void vTaskRead(void *pvParameters)
             break;
         }
     }
-    ESP_LOGI(READ_TAG, "Leitura I2S terminada: %lu blocos ", read_count);
+    ESP_LOGI(READ_TAG, "Leitura I2S terminada");
     i2s_stop();
 
     xTaskNotifyGive(xTaskStoreHandle);
@@ -74,7 +52,7 @@ void vTaskStore(void *pvParameters)
                 if (xQueueReceive(xQueueHandle, st_buffer, 0) == pdTRUE)
                 {
                     process_app_cic(&cic, &st_buffer, &data_buffer);
-                    process_app_fir(&fir, fir_coeffs, &data_buffer);
+                    process_new_fir(&data_buffer);
                     fwrite(data_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
                     write_count++;
                 }
@@ -132,6 +110,15 @@ void app_main(void)
 {
     i2s_init();
     sdcard_init(card);
+    
+    i2s_channel_enable(rx_handle);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    i2s_channel_disable(rx_handle);
+    i2s_channel_reconfig_std_clock(rx_handle, &clk_rec_cfg);
+    i2s_channel_enable(rx_handle);
+
+    init_app_cic(&cic);
+    init_app_fir(&fir);
 
     audio_file = fopen_unique(MOUNT_POINT "/file", ".raw", "wb");
     if (audio_file == NULL)
@@ -140,7 +127,7 @@ void app_main(void)
         return;
     }
 
-    xQueueHandle = xQueueCreate(DMA_BUF_NUM, I2S_BUF_SIZE_BYTES);
+    xQueueHandle = xQueueCreate(DMA_BUF_NUM, BUF_SIZE);
     if (xQueueHandle == NULL)
     {
         ESP_LOGE(MAIN_TAG, "Falha em criar fila de dados");
@@ -160,7 +147,7 @@ void app_main(void)
         while (1);
     }
 
-    BaseType_t xReturnedTask[3];
+    BaseType_t xReturnedTask[2];
     xReturnedTask[0] = xTaskCreatePinnedToCore(
         vTaskRead,
         "taskREAD",
@@ -178,18 +165,9 @@ void app_main(void)
         configMAX_PRIORITIES - 3,
         &xTaskStoreHandle,
         PRO_CPU_NUM);
-
-    xReturnedTask[2] = xTaskCreatePinnedToCore(
-        vTaskStart,
-        "taskSTART",
-        configMINIMAL_STACK_SIZE + 1024,
-        NULL,
-        configMAX_PRIORITIES - 2,
-        &xTaskStartHandle,
-        APP_CPU_NUM);
     
     // test tasks creation
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 2; i++)
     {
         if (xReturnedTask[i] == pdFAIL)
         {
@@ -198,6 +176,6 @@ void app_main(void)
         }
     }
 
-    vTaskSuspend(xTaskReadHandle);
-    vTaskSuspend(xTaskStoreHandle);
+    xTimerStart(xRecTimerHandle, 0);
+    ESP_LOGI(START_TAG, "Gravacao iniciada");
 }

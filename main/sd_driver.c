@@ -16,7 +16,7 @@ esp_err_t sdcard_init(sdmmc_card_t *card)
     };
 
     // inicializa o bus SPI
-    esp_err_t ret = spi_bus_initialize(host.slot, &bus_cfg, SPI_DMA_CHAN);
+    esp_err_t ret = spi_bus_initialize(host.slot, &bus_cfg, SPI_DMA_CH_AUTO);
     if (ret != ESP_OK)
     {
         ESP_LOGE(SD_DRIVER_TAG, "Falha ao inicializar o bus SPI (%s)", esp_err_to_name(ret));
