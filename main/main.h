@@ -51,7 +51,7 @@ app_fir_t fir;
 
 // buffers de gravacao
 long rx_buffer[PDM_BUF_SIZE];
-long st_buffer[PDM_BUF_SIZE];
+short st_buffer[PCM_BUF_SIZE];
 short data_buffer[PCM_BUF_SIZE];
 
 //firs filtering coefficients (from levy)
@@ -62,7 +62,7 @@ short fir_coeffs[FIR_ORDER] = {
 };
 
 // reconfiguracao do clock
-i2s_std_clk_config_t clk_rec_cfg = I2S_STD_CLK_DEFAULT_CONFIG(78000);
+i2s_std_clk_config_t clk_rec_cfg = I2S_STD_CLK_DEFAULT_CONFIG(75000);
 
 // function declarations
 void vTaskStart(void *pvParameters);

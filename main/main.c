@@ -7,6 +7,7 @@
 
 void vTaskRead(void *pvParameters)
 {
+    volatile int64_t t0=0,t=0;
     while (1)
     {
         if (ulTaskNotifyTake(pdTRUE, 0) != 0)
@@ -17,7 +18,8 @@ void vTaskRead(void *pvParameters)
         // wait untill rx_buffer is full 
         if (i2s_channel_read(rx_handle, (void *)rx_buffer, BUF_SIZE, NULL, portMAX_DELAY) == ESP_OK)
         {
-            xQueueSend(xQueueHandle, &rx_buffer, portMAX_DELAY);
+            process_app_cic(&cic, &rx_buffer, &data_buffer);
+            xQueueSend(xQueueHandle, &data_buffer, portMAX_DELAY);
         }
         else
         {
@@ -34,27 +36,26 @@ void vTaskRead(void *pvParameters)
 
 void vTaskStore(void *pvParameters)
 {
-    static uint32_t write_count = 0;
+    volatile int64_t t0=0,t=0;
+    volatile int64_t tt0=0,tt=0;
     while (1)
     {
         if ((xQueueHandle != NULL) && (xQueueReceive(xQueueHandle, st_buffer, pdMS_TO_TICKS(500)) == pdTRUE))
         {
-            process_app_cic(&cic, &st_buffer, &data_buffer);
-            process_app_fir(&fir, fir_coeffs, &data_buffer);
-            fwrite(data_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
-            write_count++;
+            process_new_fir(&st_buffer);
+
+            fwrite(st_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
         }
-        // write what is left when reading ends 
+        // iriie what is left when reading ends 
         if (ulTaskNotifyTake(pdTRUE, 0) != 0)
         {
             while (uxQueueMessagesWaiting(xQueueHandle) > 0)
             {
                 if (xQueueReceive(xQueueHandle, st_buffer, 0) == pdTRUE)
                 {
-                    process_app_cic(&cic, &st_buffer, &data_buffer);
-                    process_new_fir(&data_buffer);
-                    fwrite(data_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
-                    write_count++;
+                    process_new_fir(&st_buffer);
+
+                    fwrite(st_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
                 }
             }
             break;
@@ -64,7 +65,7 @@ void vTaskStore(void *pvParameters)
     fclose(audio_file);
     sdcard_deinit(card);
 
-    ESP_LOGI(STORE_TAG, "Armazenamento encerrado e arquivo salvo: %lu blocos gravados", write_count);
+    ESP_LOGI(STORE_TAG, "Armazenamento encerrado e arquivo salvo");
     vTaskDelete(NULL);
 }
 
@@ -127,7 +128,7 @@ void app_main(void)
         return;
     }
 
-    xQueueHandle = xQueueCreate(DMA_BUF_NUM, BUF_SIZE);
+    xQueueHandle = xQueueCreate(DMA_BUF_NUM, PCM_BUF_SIZE * sizeof(short));
     if (xQueueHandle == NULL)
     {
         ESP_LOGE(MAIN_TAG, "Falha em criar fila de dados");
