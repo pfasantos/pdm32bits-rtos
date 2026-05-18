@@ -13,10 +13,10 @@
 #define SPI_DMA_CHAN 1
 #define MOUNT_POINT "/sdcard"
 
-#define PIN_NUM_MISO 19
-#define PIN_NUM_MOSI 23
-#define PIN_NUM_CLK  18
-#define PIN_NUM_CS   22
+#define PIN_NUM_MISO 13
+#define PIN_NUM_MOSI 11
+#define PIN_NUM_CLK  12
+#define PIN_NUM_CS   10
 
 esp_err_t sdcard_init(sdmmc_card_t *card);
 esp_err_t sdcard_deinit(sdmmc_card_t *card);
