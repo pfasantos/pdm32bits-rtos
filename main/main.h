@@ -2,6 +2,8 @@
 #define _MAIN_H_
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
+
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -17,8 +19,12 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
+#include "i2s_std.h"
+#include "pdm2pcm.h"
+#include "sd_driver.h"
+
 //macros
-#define REC_TIME_MS     5 * 1000                    // recording time
+#define REC_TIME_MS     1 * 60 * 1000                    // recording time
 #define PDM_BUF_SIZE    BUF_SIZE/4        // store buffer in long array
 #define PCM_BUF_SIZE    BUF_SIZE/2        // store buffer in short array
 
