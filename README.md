@@ -56,4 +56,4 @@ The author's final IC report describes an ESP32-S3, an SPH0641LU4H-1 PDM microph
 - `main/pdm2pcm.h`: filter structures and conversion API.
 - `main/main.h`: recording constants and task entry points.
 
-Generate the Doxygen HTML reference from the repository root with `doxygen Doxyfile`. Open `build/doxygen/html/index.html`. Generated files stay under the ignored `build/` directory.
+Generate the Doxygen HTML reference from the repository root with `doxygen Doxyfile`. Open `build/html/index.html`. Generated files stay under the ignored `build/` directory.
