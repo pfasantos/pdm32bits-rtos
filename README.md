@@ -6,7 +6,7 @@ ESP-IDF firmware for an ESP32-S3 that reads a microphone data stream through I2S
 
 - ESP-IDF environment with `idf.py` available.
 - An ESP32-S3 target (`CONFIG_IDF_TARGET="esp32s3"` in the committed `sdkconfig`).
-- A microphone and microSD interface wired to the pins below. The microphone model and electrical requirements are not specified in this repository.
+- A microphone and microSD interface wired to the pins below. The final IC report for the project identifies the tested microphone as an SPH0641LU4H-1; the complete electrical wiring is not specified in this repository.
 - A microSD card with a FAT filesystem. The mount configuration does not format a card when mounting fails.
 
 ## Connections configured in source
@@ -36,6 +36,10 @@ Replace `PORT` with the serial device for your board. The committed configuratio
 On startup, `app_main()` initializes I2S, mounts the SD card at `/sdcard`, initializes the filters, and creates `/sdcard/file_0.raw` (or the next unused number). The reader task receives I2S data, converts it with `process_app_cic()`, and places sample buffers on a FreeRTOS queue. The storage task applies `process_new_fir()` and writes those buffers to the file. A one-shot software timer requests the reader to stop after `REC_TIME_MS` (60 seconds by default); the reader then notifies the storage task to drain the queue and close the file.
 
 The configured I2S clock starts at 8,000 and is reconfigured to 75,000 before recording. The source uses 32-bit stereo I2S slots. The output file has no WAV header: `fwrite()` stores `short` samples as raw native-endian bytes. The microphone model, effective output sample rate, and channel interpretation are not established by the repository, so those properties should be measured before importing the file as audio.
+
+## Tested hardware and research context
+
+The author's final IC report describes an ESP32-S3, an SPH0641LU4H-1 PDM microphone and a 32 GB SanDisk Extreme A1 microSD card. It reports functional capture of test tones from 20 to 100 kHz, software CIC/FIR conversion, and recording sizes close to the expected volume in the stated experiments. These are results from that experimental setup, not a calibrated microphone response or a guarantee for every board and card. The report did not provide a complete pin-by-pin power and selection wiring diagram; the GPIO table above comes from this repository's source.
 
 ## Resource and behavior notes
 
