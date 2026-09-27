@@ -1,6 +1,6 @@
 # pdm32bits-rtos
 
-ESP-IDF firmware for an ESP32-S3 that reads a microphone data stream through I2S standard-mode RX, applies a two-stage CIC and a short PCM post-filter, and writes raw 16-bit samples to a microSD card. It uses separate FreeRTOS reader and storage tasks. The simpler [pdm32bits](https://github.com/pfasantos/pdm32bits) repository stores the I2S bytes directly.
+ESP-IDF firmware for an ESP32-S3 that reads a microphone data stream through I2S standard-mode RX, applies a two-stage CIC and a short PCM post-filter, and writes raw 16-bit samples to a microSD card. It uses separate FreeRTOS reader and storage tasks.
 
 ## Requirements
 
