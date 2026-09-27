@@ -9,102 +9,101 @@
 
 void vTaskRead(void *pvParameters)
 {
-  while (1)
-  {
-    if (ulTaskNotifyTake(pdTRUE, 0) != 0)
+    for (;;)
     {
-      break;
-    }
+        if (ulTaskNotifyTake(pdTRUE, 0) != 0)
+        {
+            break;
+        }
 
-    // wait untill rx_buffer is full
-    if (i2s_channel_read(rx_handle, (void *)rx_buffer, BUF_SIZE, NULL,
-                         portMAX_DELAY) == ESP_OK)
-    {
-      process_app_cic(&cic, &rx_buffer, &data_buffer);
-      xQueueSend(xQueueHandle, &data_buffer, portMAX_DELAY);
+        // wait until plPdmBuffer is full
+        if (i2s_channel_read(xRxHandle, (void *)plPdmBuffer, I2S_BUFFER_SIZE, NULL,
+                             portMAX_DELAY) == ESP_OK)
+        {
+            process_app_cic(&xCic, &plPdmBuffer, &psPcmBuffer);
+            xQueueSend(xPcmQueue, &psPcmBuffer, portMAX_DELAY);
+        }
+        else
+        {
+            ESP_LOGE(I2S_TAG, "Erro durante a leitura: errno %d", errno);
+            break;
+        }
     }
-    else
-    {
-      ESP_LOGE(I2S_TAG, "Erro durante a leitura: errno %d", errno);
-      break;
-    }
-  }
-  ESP_LOGI(READ_TAG, "Leitura I2S terminada");
-  i2s_stop();
+    ESP_LOGI(MAIN_READ_TAG, "Leitura I2S terminada");
+    vI2SStdStop();
 
-  xTaskNotifyGive(xTaskStoreHandle);
-  vTaskDelete(NULL);
+    xTaskNotifyGive(xStorageTask);
+    vTaskDelete(NULL);
 }
 
 void vTaskStore(void *pvParameters)
 {
-  while (1)
-  {
-    if ((xQueueHandle != NULL) &&
-        (xQueueReceive(xQueueHandle, st_buffer, pdMS_TO_TICKS(500)) ==
-         pdTRUE))
+    for (;;)
     {
-      process_new_fir(&st_buffer);
-
-      fwrite(st_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
-    }
-    // iriie what is left when reading ends
-    if (ulTaskNotifyTake(pdTRUE, 0) != 0)
-    {
-      while (uxQueueMessagesWaiting(xQueueHandle) > 0)
-      {
-        if (xQueueReceive(xQueueHandle, st_buffer, 0) == pdTRUE)
+        if ((xPcmQueue != NULL) &&
+            (xQueueReceive(xPcmQueue, psStoreBuffer, pdMS_TO_TICKS(500)) == pdTRUE))
         {
-          process_new_fir(&st_buffer);
+            process_new_fir(&psStoreBuffer);
 
-          fwrite(st_buffer, sizeof(short), PCM_BUF_SIZE, audio_file);
+            fwrite(psStoreBuffer, sizeof(short), MAIN_PCM_BUFFER_SIZE, pxAudioFile);
         }
-      }
-      break;
-    }
-  }
-  fsync(fileno(audio_file));
-  fclose(audio_file);
-  sdcard_deinit(card);
+        // iriie what is left when reading ends
+        if (ulTaskNotifyTake(pdTRUE, 0) != 0)
+        {
+            while (uxQueueMessagesWaiting(xPcmQueue) > 0)
+            {
+                if (xQueueReceive(xPcmQueue, psStoreBuffer, 0) == pdTRUE)
+                {
+                    process_new_fir(&psStoreBuffer);
 
-  ESP_LOGI(STORE_TAG, "Armazenamento encerrado e arquivo salvo");
-  vTaskDelete(NULL);
+                    fwrite(psStoreBuffer, sizeof(short), MAIN_PCM_BUFFER_SIZE, pxAudioFile);
+                }
+            }
+            break;
+        }
+    }
+    fsync(fileno(pxAudioFile));
+    fclose(pxAudioFile);
+    xSdDriverDeinit(pxSdCard);
+
+    ESP_LOGI(MAIN_STORE_TAG, "Armazenamento encerrado e arquivo salvo");
+    vTaskDelete(NULL);
 }
 
 // TIMERS SECTION --------------------------
 
-void vRecTimer(TimerHandle_t xTimerHandle)
+void vMainRecTimer(TimerHandle_t xTimer)
 {
-  xTaskNotifyGive(xTaskReadHandle);
-  ESP_LOGI(TIMER_TAG, "Tempo de gravacao acabou.");
+    xTaskNotifyGive(xReaderTask);
+    ESP_LOGI(MAIN_TIMER_TAG, "Tempo de gravacao acabou.");
 }
 
 // FUNCTIONS SECTION ------------------------
 
-FILE *fopen_unique(const char *base_path, const char *ext, const char *mode)
+FILE *pxMainFopenUnique(const char *pcBasePath, const char *pcExtension, const char *pcMode)
 {
-  char file_path[128];
-  struct stat st;
-  int index = 0;
+    char cFilePath[128];
+    struct stat xFileStat;
+    int iIndex = 0;
 
-  while (1)
-  {
-    // Construct the filename: base_path + "_" + index + ext
-    snprintf(file_path, sizeof(file_path), "%s_%d%s", base_path, index, ext);
-
-    // Check if file exists
-    if (stat(file_path, &st) == 0)
+    for (;;)
     {
-      index++;
-    }
-    else
-    {
-      break;
-    }
-  }
+        // Construct the filename: pcBasePath + "_" + iIndex + pcExtension
+        snprintf(cFilePath, sizeof(cFilePath), "%s_%d%s", pcBasePath, iIndex, pcExtension);
 
-  ESP_LOGI("FILE_SYS", "Opening file: %s", file_path);
-  return fopen(file_path, mode);
+        // Check if file exists
+        if (stat(cFilePath, &xFileStat) == 0)
+        {
+            iIndex++;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    ESP_LOGI("FILE_SYS", "Opening file: %s", cFilePath);
+    return fopen(cFilePath, pcMode);
 }
 
 // MAIN SETUP SECTION -----------------------
@@ -112,67 +111,68 @@ FILE *fopen_unique(const char *base_path, const char *ext, const char *mode)
 /** @brief Initialize I2S, storage, filters, tasks, queue and recording timer.
  *  The timer ends the reader task; the storage task then drains the queue and
  *  closes the raw sample file.
- *  @warning This function does not check sdcard_init() or fwrite() results.
+ *  @warning This function does not check xSdDriverInit() or fwrite() results.
  */
 void app_main(void)
 {
-  i2s_init();
-  sdcard_init(card);
+    vI2SStdInit();
+    xSdDriverInit(pxSdCard);
 
-  i2s_channel_enable(rx_handle);
-  vTaskDelay(pdMS_TO_TICKS(5));
-  i2s_channel_disable(rx_handle);
-  i2s_channel_reconfig_std_clock(rx_handle, &clk_rec_cfg);
-  i2s_channel_enable(rx_handle);
+    i2s_channel_enable(xRxHandle);
+    vTaskDelay(pdMS_TO_TICKS(5));
+    i2s_channel_disable(xRxHandle);
+    i2s_channel_reconfig_std_clock(xRxHandle, &xRecordingClockConfig);
+    i2s_channel_enable(xRxHandle);
 
-  init_app_cic(&cic);
-  init_app_fir(&fir);
+    init_app_cic(&xCic);
+    init_app_fir(&xFir);
 
-  audio_file = fopen_unique(MOUNT_POINT "/file", ".raw", "wb");
-  if (audio_file == NULL)
-  {
-    ESP_LOGE(MAIN_TAG, "Falha ao abrir o arquivo");
-    return;
-  }
-
-  xQueueHandle = xQueueCreate(DMA_BUF_NUM, PCM_BUF_SIZE * sizeof(short));
-  if (xQueueHandle == NULL)
-  {
-    ESP_LOGE(MAIN_TAG, "Falha em criar fila de dados");
-    while (1)
-      ;
-  }
-
-  xRecTimerHandle = xTimerCreate("REC timer", pdMS_TO_TICKS(REC_TIME_MS),
-                                 pdFALSE, (void *)0, vRecTimer);
-
-  if (xRecTimerHandle == NULL)
-  {
-    ESP_LOGE(MAIN_TAG, "Falha ao criar o timer");
-    while (1)
-      ;
-  }
-
-  BaseType_t xReturnedTask[2];
-  xReturnedTask[0] = xTaskCreatePinnedToCore(
-      vTaskRead, "taskREAD", configMINIMAL_STACK_SIZE + 4096, NULL,
-      configMAX_PRIORITIES - 3, &xTaskReadHandle, APP_CPU_NUM);
-
-  xReturnedTask[1] = xTaskCreatePinnedToCore(
-      vTaskStore, "taskSTORE", configMINIMAL_STACK_SIZE + 4096, NULL,
-      configMAX_PRIORITIES - 3, &xTaskStoreHandle, PRO_CPU_NUM);
-
-  // test tasks creation
-  for (int i = 0; i < 2; i++)
-  {
-    if (xReturnedTask[i] == pdFAIL)
+    pxAudioFile = pxMainFopenUnique(SD_MOUNT_POINT "/file", ".raw", "wb");
+    if (pxAudioFile == NULL)
     {
-      ESP_LOGE(MAIN_TAG, "Erro ao criar a task %d", i);
-      while (1)
-        ;
+        ESP_LOGE(MAIN_TAG, "Falha ao abrir o arquivo");
+        return;
     }
-  }
 
-  xTimerStart(xRecTimerHandle, 0);
-  ESP_LOGI(START_TAG, "Gravacao iniciada");
+    xPcmQueue = xQueueCreate(CONFIG_PDM_DMA_BUFFER_COUNT, MAIN_PCM_BUFFER_SIZE * sizeof(short));
+    if (xPcmQueue == NULL)
+    {
+        ESP_LOGE(MAIN_TAG, "Falha em criar fila de dados");
+        for (;;)
+            ;
+    }
+
+    xRecordingTimer =
+        xTimerCreate("REC timer", pdMS_TO_TICKS(CONFIG_PDM_RECORDING_DURATION_SECONDS * 1000U),
+                     pdFALSE, (void *)0, vMainRecTimer);
+
+    if (xRecordingTimer == NULL)
+    {
+        ESP_LOGE(MAIN_TAG, "Falha ao criar o timer");
+        for (;;)
+            ;
+    }
+
+    BaseType_t xTaskCreateStatus[2];
+    xTaskCreateStatus[0] =
+        xTaskCreatePinnedToCore(vTaskRead, "taskREAD", configMINIMAL_STACK_SIZE + 4096, NULL,
+                                configMAX_PRIORITIES - 3, &xReaderTask, APP_CPU_NUM);
+
+    xTaskCreateStatus[1] =
+        xTaskCreatePinnedToCore(vTaskStore, "taskSTORE", configMINIMAL_STACK_SIZE + 4096, NULL,
+                                configMAX_PRIORITIES - 3, &xStorageTask, PRO_CPU_NUM);
+
+    // test tasks creation
+    for (int iTaskIndex = 0; iTaskIndex < 2; iTaskIndex++)
+    {
+        if (xTaskCreateStatus[iTaskIndex] == pdFAIL)
+        {
+            ESP_LOGE(MAIN_TAG, "Erro ao criar a task %d", iTaskIndex);
+            for (;;)
+                ;
+        }
+    }
+
+    xTimerStart(xRecordingTimer, 0);
+    ESP_LOGI(MAIN_START_TAG, "Gravacao iniciada");
 }

@@ -1,8 +1,10 @@
 /** @file main.h
  *  @brief RTOS recorder constants, shared buffers and task entry points.
  */
-#ifndef _MAIN_H_
-#define _MAIN_H_
+#ifndef MAIN_H
+#define MAIN_H
+
+#include "sdkconfig.h"
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
@@ -26,52 +28,51 @@
 #include "pdm2pcm.h"
 #include "sd_driver.h"
 
-//macros
-#define REC_TIME_MS     1 * 60 * 1000                    // recording time
-#define PDM_BUF_SIZE    BUF_SIZE/4        // store buffer in long array
-#define PCM_BUF_SIZE    BUF_SIZE/2        // store buffer in short array
+// macros
+#define MAIN_PDM_BUFFER_SIZE I2S_BUFFER_SIZE / 4 // store buffer in long array
+#define MAIN_PCM_BUFFER_SIZE I2S_BUFFER_SIZE / 2 // store buffer in short array
 
 // tags
-#define MAIN_TAG  "main"
-#define I2S_TAG   "i2s"
-#define READ_TAG  "read_task"
-#define STORE_TAG "store_task"
-#define START_TAG "start_task"
-#define TIMER_TAG "timer"
+#define MAIN_TAG "main"
+#define MAIN_READ_TAG "read_task"
+#define MAIN_STORE_TAG "store_task"
+#define MAIN_START_TAG "start_task"
+#define MAIN_TIMER_TAG "timer"
 
 // handles
-QueueHandle_t xQueueHandle;
-TimerHandle_t xRecTimerHandle;
-TaskHandle_t xTaskReadHandle;
-TaskHandle_t xTaskStoreHandle;
-TaskHandle_t xTaskStartHandle;
+QueueHandle_t xPcmQueue;
+TimerHandle_t xRecordingTimer;
+TaskHandle_t xReaderTask;
+TaskHandle_t xStorageTask;
+TaskHandle_t xStartTask;
 
-//flags
-volatile BaseType_t read_flag;
-volatile BaseType_t st_flag;
+// flags
+volatile BaseType_t xReadFlag;
+volatile BaseType_t xStoreFlag;
 
 // cartao e arquivo
-sdmmc_card_t *card;
-FILE *audio_file;
+sdmmc_card_t *pxSdCard;
+FILE *pxAudioFile;
 
-//filtering structures
-app_cic_t cic;
-app_fir_t fir;
+// filtering structures
+app_cic_t xCic;
+app_fir_t xFir;
 
 // buffers de gravacao
-long rx_buffer[PDM_BUF_SIZE];
-short st_buffer[PCM_BUF_SIZE];
-short data_buffer[PCM_BUF_SIZE];
+long plPdmBuffer[MAIN_PDM_BUFFER_SIZE];
+short psStoreBuffer[MAIN_PCM_BUFFER_SIZE];
+short psPcmBuffer[MAIN_PCM_BUFFER_SIZE];
 
-//firs filtering coefficients (from levy)
-short fir_coeffs[FIR_ORDER] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, -1, -1, 4, 0, -9, 4, 34, 34, 4, -9, 0, 4, -1, -1, 1,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+// firs filtering coefficients (from levy)
+short psFirCoefficients[FIR_ORDER] = {
+    0, 0, 0, 0,  0,  0, 0, 0,  0, 0,  0,  0, 0,  0, 0, 0,  0,  0, 0, 0, 0, 0,
+    0, 0, 1, -1, -1, 4, 0, -9, 4, 34, 34, 4, -9, 0, 4, -1, -1, 1, 0, 0, 0, 0,
+    0, 0, 0, 0,  0,  0, 0, 0,  0, 0,  0,  0, 0,  0, 0, 0,  0,  0, 0, 0,
 };
 
 // reconfiguracao do clock
-i2s_std_clk_config_t clk_rec_cfg = I2S_STD_CLK_DEFAULT_CONFIG(75000);
+i2s_std_clk_config_t xRecordingClockConfig =
+    I2S_STD_CLK_DEFAULT_CONFIG(CONFIG_PDM_I2S_RECORD_RATE_HZ);
 
 // function declarations
 /** @brief Legacy task declaration without a definition in this project.
@@ -89,16 +90,16 @@ void vTaskRead(void *pvParameters);
  */
 void vTaskStore(void *pvParameters);
 /** @brief Notify the reader task when the recording interval expires.
- *  @param xTimerHandle Expired FreeRTOS software timer; unused by the callback.
+ *  @param xTimer Expired FreeRTOS software timer; unused by the callback.
  */
-void vRecTimer(TimerHandle_t xTimerHandle);
+void vMainRecTimer(TimerHandle_t xTimer);
 /** @brief Open the first unused numbered recording path.
- *  @param base_path Path prefix before the numeric suffix.
- *  @param ext Filename extension, including its leading dot.
- *  @param mode Mode passed to fopen().
+ *  @param pcBasePath Path prefix before the numeric suffix.
+ *  @param pcExtension Filename extension, including its leading dot.
+ *  @param pcMode Mode passed to fopen().
  *  @return Open file handle, or NULL if fopen() fails.
  *  @note Path construction uses a 128-byte buffer without truncation reporting.
  */
-FILE *fopen_unique(const char *base_path, const char *ext, const char *mode);
+FILE *pxMainFopenUnique(const char *pcBasePath, const char *pcExtension, const char *pcMode);
 
-#endif // _MAIN_H_
+#endif // MAIN_H
