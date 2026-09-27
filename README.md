@@ -47,7 +47,6 @@ The author's final IC report describes an ESP32-S3, an SPH0641LU4H-1 PDM microph
 - The two tasks are pinned to different ESP32-S3 cores. Both request `configMINIMAL_STACK_SIZE + 4096` stack units.
 - SD writes can block the storage task; a full queue can then block the reader task. The code does not report queue latency or lost samples.
 - `sdcard_init()` returns an error on SPI or mount failure, but `app_main()` does not check it. The card pointer is passed by value, so the caller's `card` variable is not set by the mount function; the later unmount call should not be assumed to have a valid card pointer. File writes are also not checked for short writes.
-- The filter code includes heap-allocating FIFO/CIC helpers. The recording path uses `app_cic_t` and `process_app_cic()` rather than those allocating helpers.
 
 ## Source and API documentation
 
