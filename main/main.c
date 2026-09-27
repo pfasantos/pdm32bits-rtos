@@ -109,6 +109,11 @@ FILE *fopen_unique(const char *base_path, const char *ext, const char *mode)
 
 // MAIN SETUP SECTION -----------------------
 
+/** @brief Initialize I2S, storage, filters, tasks, queue and recording timer.
+ *  The timer ends the reader task; the storage task then drains the queue and
+ *  closes the raw sample file.
+ *  @warning This function does not check sdcard_init() or fwrite() results.
+ */
 void app_main(void)
 {
   i2s_init();

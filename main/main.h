@@ -1,3 +1,6 @@
+/** @file main.h
+ *  @brief RTOS recorder constants, shared buffers and task entry points.
+ */
 #ifndef _MAIN_H_
 #define _MAIN_H_
 #include <string.h>
@@ -71,10 +74,31 @@ short fir_coeffs[FIR_ORDER] = {
 i2s_std_clk_config_t clk_rec_cfg = I2S_STD_CLK_DEFAULT_CONFIG(75000);
 
 // function declarations
+/** @brief Legacy task declaration without a definition in this project.
+ *  @param pvParameters Unused task parameter if implemented.
+ */
 void vTaskStart(void *pvParameters);
+/** @brief Read I2S buffers, convert PDM words and queue PCM samples.
+ *  @param pvParameters Unused FreeRTOS task argument.
+ *  @note Waits for the recording timer's notification before exiting.
+ */
 void vTaskRead(void *pvParameters);
+/** @brief Filter queued samples and write them to the raw file.
+ *  @param pvParameters Unused FreeRTOS task argument.
+ *  @note Drains queued buffers after the reader notifies it to stop.
+ */
 void vTaskStore(void *pvParameters);
+/** @brief Notify the reader task when the recording interval expires.
+ *  @param xTimerHandle Expired FreeRTOS software timer; unused by the callback.
+ */
 void vRecTimer(TimerHandle_t xTimerHandle);
+/** @brief Open the first unused numbered recording path.
+ *  @param base_path Path prefix before the numeric suffix.
+ *  @param ext Filename extension, including its leading dot.
+ *  @param mode Mode passed to fopen().
+ *  @return Open file handle, or NULL if fopen() fails.
+ *  @note Path construction uses a 128-byte buffer without truncation reporting.
+ */
 FILE *fopen_unique(const char *base_path, const char *ext, const char *mode);
 
 #endif // _MAIN_H_
